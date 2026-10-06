@@ -1,0 +1,14 @@
+{
+  "name": "perimetr-browser-fps",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ПЕРИМЕТР — браузерная кооперативная 3D FPS",
+  "scripts": {
+    "start": "node standalone/server.mjs",
+    "check": "node --check standalone/server.mjs && node --check dist/art.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
