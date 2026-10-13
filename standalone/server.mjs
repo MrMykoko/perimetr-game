@@ -163,6 +163,7 @@ const server = createServer(async (request, response) => {
         name: cleanName(body.name),
         klass: classes.has(body.klass) ? body.klass : 'assault',
         input: {},
+        signals: [],
         updatedAt: time
       };
       rooms.set(code, {
@@ -177,7 +178,7 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    const match = path.match(/^\/api\/rooms\/([A-Z2-9]{6})(?:\/(join|class|input|state|close|leave))?$/);
+    const match = path.match(/^\/api\/rooms\/([A-Z2-9]{6})(?:\/(join|class|input|state|signal|close|leave))?$/);
     if (!match) {
       fail(response, 'Комната не найдена.', 404);
       return;
@@ -202,6 +203,7 @@ const server = createServer(async (request, response) => {
         name: cleanName(body.name),
         klass: classes.has(body.klass) ? body.klass : 'assault',
         input: {},
+        signals: [],
         updatedAt: Date.now()
       };
       room.players.set(token, player);
@@ -213,6 +215,27 @@ const server = createServer(async (request, response) => {
     const player = room.players.get(token);
     const isHost = token === room.hostToken;
     if (!player) return fail(response, 'Нет доступа к комнате.', 403);
+
+    if (action === 'signal' && request.method === 'GET') {
+      const messages = player.signals.splice(0, 100);
+      touchPlayer(player);
+      json(response, { messages });
+      return;
+    }
+
+    if (action === 'signal' && request.method === 'POST') {
+      const body = await readJson(request);
+      const targetId = String(body.to || '').slice(0, 36);
+      const target = [...room.players.values()].find(candidate => candidate.token.slice(0, 36) === targetId);
+      if (!target) return fail(response, 'Игрок для прямого соединения не найден.', 404);
+      const serialized = JSON.stringify(body.payload || {});
+      if (serialized.length > 20_000) return fail(response, 'Сигнал слишком большой.', 413);
+      target.signals.push({ from: token.slice(0, 36), payload: body.payload || {} });
+      if (target.signals.length > 100) target.signals.splice(0, target.signals.length - 100);
+      touchPlayer(player);
+      json(response, { ok: true });
+      return;
+    }
 
     if (action === 'class' && request.method === 'POST') {
       if (room.status !== 'lobby') return fail(response, 'Класс нельзя менять после запуска.', 409);
